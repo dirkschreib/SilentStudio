@@ -14,7 +14,7 @@ import IOKit
 // TODO: read more sensors e.g. cpu/gpu
 let checkinterval = 30.0
 var targetrpm: [Float: String] = [:]
-targetrpm[40.0]="0"
+targetrpm[1.0]="0"
 targetrpm[50.0]="0"
 targetrpm[60.0]="AUTO"
 //targetrpm[55.0]="560.5"
