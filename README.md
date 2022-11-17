@@ -22,7 +22,7 @@ The default setting switches the fan off for temperatures below 50°C and switch
 
 | Temperature in °C| rpm |
 | ----------- | --- |
-| 40.0 | 0 |
+| 1.0 | 0 |
 | 50.0 | 0 |
 | 60.0 | AUTO |
 
