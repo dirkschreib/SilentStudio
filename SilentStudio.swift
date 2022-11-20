@@ -250,7 +250,6 @@ if targetlist.count > 0 && targetlist.count.isMultiple(of: 2) {
     var n = 0
     targetrpm = [:]
     while n < targetlist.count {
-        print(now, "Set targetrpm")
         targetrpm[Float(targetlist[n]) ?? 0.0] = targetlist[n+1]
         n += 2
     }
