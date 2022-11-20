@@ -4,7 +4,17 @@ Set fan speed of Mac Studio
 ## How to use?
 Inside terminal:
 ```
-sudo ./SilentStudio.swift
+sudo ./SilentStudio.swift -h
+usage: SilentStudio [--] [<temp> <rpm>]* [-d] [-h] [-i <sec>] [-s <sensor>*]
+
+  options
+  <temp> <rpm>     Pair(s) of temperature and rpm. "AUTO" for automatic setting. Default: [(key: 0.0, value: "0"), (key: 50.0, value: "0"), (key: 60.0, value: "AUTO")]
+  -d               Debug mode. List every value read and written
+  -h               This help text
+  -i <sec>         Checks every <sec> seconds. Default: 30.0
+  -s <sensor>*     List of sensors to read. Default: ["TT0D", "TT1D", "TT2D"]
+          
+ Program will run in an endless loop. Use ctrl-c to stop. Fans will be resetted to AUTO mode.
 ```
 If you forget the sudo part, it will remind you:
 ```
