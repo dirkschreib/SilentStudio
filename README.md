@@ -32,17 +32,16 @@ The default setting switches the fan off for temperatures below 50°C and switch
 
 | Temperature in °C| rpm |
 | ----------- | --- |
-| 1.0 | 0 |
-| 50.0 | 0 |
-| 60.0 | AUTO |
+| 0 | 0 |
+| 50 | 0 |
+| 60 | AUTO |
 
 ## How to change default behaviour?
-Currently you have to change the script lines 15 to 22. 
-
-The `checkinterval` defines the duration between checks in seconds. Needs to be one seconds or greater.
-With the dictionary `targetrpm` you can define as many (temperature, rpm) value pairs as you want. Values below ~550 rpm will not work.
-
-The temperature sensor I check in my example is "TT0D" (see line 212). This is the first (i.e 0) thunderbolt port. On an idle Mac Studio this is the sensor with the most volatility. I will probable expand this to check the CPU and GPU temperature as well in the future.
+Use the commandline arguments described above:
+ - with `-i` you can change the `checkinterval`
+ - with `-s` you can change the sensors 
+ - with `-d` you can switch on debug mode (will log every value read and written from/to SMC)
+ - arguments without a flag define the temperature curve. Please notice that in a list of e.g `0 0 50 0 60 AUTO` the temperature 50°C will be used to switch the fans of, regardless if the temperature is currently falling or rising. This way there is a bulitin hysteresis. 
 
 # Disclaimer
 Use on your own risk. Don't use with CPU/GPU intensive tasks.
