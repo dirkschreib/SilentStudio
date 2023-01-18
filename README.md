@@ -1,15 +1,31 @@
 # SilentStudio
 Set fan speed of Mac Studio
 
+## New Version (Beta)
+
+I separated IOServiceConnection into a separate file to reuse it in the menu app. Unfortunately Swift (as an interpreter) is not able to handle scripts with multiple source files. We have to compile it together:
+
+```
+swiftc SilentStudio.swift IOServiceConnection.swift -o SilentStudio
+swiftc SilentStudioMenuApp.swift IOServiceConnection.swift -o SilentStudioMenu
+sudo chown root SilentStudio
+sudo chmod +s SilentStudio
+```
+
+With the last two commands you don't need sudo for every invocation of SilentStudio from the commandline. If you want to use the SilentStudioMenu app, they are mandatory. SilentStudioMenu will invoke SilentStudio to set the fan speed. It is currently not possible to change the "temperature curve" inside SilentStudioMenu. This will be considered in future updates.
+
+Besides the refactoring of IOServiceConnection, SilentStudio has one more option "-f" to set the fan speed directly.
+
 ## How to use?
 Inside terminal:
 ```
-sudo ./SilentStudio.swift -h
+./SilentStudio -h
 usage: SilentStudio [--] [<temp> <rpm>]* [-d] [-h] [-i <sec>] [-s <sensor>*]
 
   options
   <temp> <rpm>     Pair(s) of temperature and rpm. "AUTO" for automatic setting. Default: [(key: 0.0, value: "0"), (key: 50.0, value: "0"), (key: 60.0, value: "AUTO")]
   -d               Debug mode. List every value read and written
+  -f <rpm>         Set fans to rpm and exit
   -h               This help text
   -i <sec>         Checks every <sec> seconds. Default: 30.0
   -s <sensor>*     List of sensors to read. Default: ["TT0D", "TT1D", "TT2D"]
