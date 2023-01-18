@@ -120,7 +120,7 @@ struct SilentMenuApp: App {
     @ObservedObject var state = HWStatus()
 
     var body: some Scene {
-        MenuBarExtra("\(String(format: "%.1f", state.currentTemp)) / \(String(format: "%.0f", state.currentRpm))") {
+        MenuBarExtra {
             Toggle(isOn: $state.automatic) {
                 Text("Fan automatic")
             }.keyboardShortcut("a")
@@ -141,6 +141,13 @@ struct SilentMenuApp: App {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")
+        } label: {
+            Image(systemName: "fanblades")
+            Text(String(format: "%.0f", state.currentRpm))
+        }
+        MenuBarExtra {} label: {
+            Image(systemName: "thermometer.medium")
+            Text(String(format: "%.1f", state.currentTemp))
         }
     }
 }
