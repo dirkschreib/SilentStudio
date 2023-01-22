@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Charts
 
 var sensorlist = ["TT0D", "TT1D", "Tp02"]
 var fanlist = ["F0Ac", "F1Ac"]
@@ -19,7 +20,7 @@ func setFan(_ rpm: String) {
         try task.run()
         task.waitUntilExit()
     } catch {
-        print("coudn't run helper task")
+        print("error, coudn't run helper task")
     }
 }
 
@@ -56,11 +57,19 @@ class HWStatus: ObservableObject {
         willSet { DispatchQueue.main.async { self.objectWillChange.send() }}
     }
     var lasttemp: Float = 0.0
+    var chartRpm: [Float:Int] = [:]
+    let dateFormatter = DateFormatter()
+    var now: String {
+        dateFormatter.string(from: Date())
+    }
     
     init() {
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        chartRpm = Dictionary(uniqueKeysWithValues: targetrpm.map() { key, value in if value == "AUTO" { return (key,1330) } else { return (key,Int(value) ?? 0) }} )
         let _ = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue:nil, using: self.didWake(_:))
         let _ = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue:nil, using: self.willSleep(_:))
         timer = Timer.scheduledTimer(withTimeInterval: checkIntervall, repeats: true, block: updateTempRpm(_:))
+
         setStartTemp()
     }
     
@@ -76,16 +85,15 @@ class HWStatus: ObservableObject {
                 }
             }
         } catch {
-            print("error")
+            print(now, "error")
         }
     }
     
     func updateTempRpm(_ tim: Timer) {
         do {
-            print("time update", automatic)
-            self.currentTemp = try sensorlist.reduce(0.0,{ result, sensor in max(result, try HWStatus.connection.read(sensor))})
-            self.currentRpm = try fanlist.reduce(10000.0, {result, fan in min(result, try HWStatus.connection.read(fan))})
-            print(self.currentTemp, self.currentRpm, self.lasttemp)
+            currentTemp = try sensorlist.reduce(0.0,{ result, sensor in max(result, try HWStatus.connection.read(sensor))})
+            currentRpm = try fanlist.reduce(10000.0, {result, fan in min(result, try HWStatus.connection.read(fan))})
+            print(now, "current", self.currentTemp, self.currentRpm, self.lasttemp)
 
             if automatic {
                 // only change rpm if temperature crosses a "border"
@@ -99,19 +107,47 @@ class HWStatus: ObservableObject {
                 }
             }
         } catch {
-            print("error")
+            print(now, "error updateTempRpm")
         }
     }
 
     func willSleep(_ notification: Notification) {
-        print("will sleep")
+        print(now, "will sleep")
         // I disabled the following line because it seems that the fans stay on during sleep otherwise
         //setFan("AUTO")
     }
 
     func didWake(_ notification: Notification) {
-        print("did wake")
+        print(now, "did wake")
         setStartTemp()
+    }
+}
+
+struct MenuView: View {
+    @ObservedObject var state: HWStatus
+
+    var body: some View {
+        Chart() {
+            ForEach(state.chartRpm.sorted(by: <), id: \.key) { key, value in
+                LineMark(x: .value("Temp", key), y: .value("Rpm", value)).interpolationMethod(.stepEnd).lineStyle(StrokeStyle(lineWidth:3,lineCap: .round, lineJoin: .round))
+            }.foregroundStyle(by: .value("way", "up"))
+            ForEach(state.chartRpm.sorted(by: <), id: \.key) { key, value in
+                LineMark(x: .value("Temp", key), y: .value("Rpm", value)).interpolationMethod(.stepStart).lineStyle(StrokeStyle(lineWidth:3,lineCap: .round, lineJoin: .round))
+            }.foregroundStyle(by: .value("way", "down"))
+            PointMark(x: .value("Temp", state.currentTemp), y: .value("Rpm", state.currentRpm)).foregroundStyle(by: .value("way", "current")).annotation() {
+                VStack {
+                    HStack {
+                        Image(systemName: "thermometer.medium")
+                        Text(String(format: "%.1f", state.currentTemp))
+                    }
+                    HStack {
+                        Image(systemName: "fanblades")
+                        Text(String(format: "%.0f", state.currentRpm))
+                    }
+                }
+            }
+        }.frame(minWidth:300, minHeight:300).padding(16)
+            .chartXScale(domain: 40...60)
     }
 }
 
@@ -127,12 +163,12 @@ struct SilentMenuApp: App {
             Divider()
             Button("Fan off") {
                 setFan("0")
-                print("off")
+                state.lasttemp = 0.0
             }
             .keyboardShortcut("0")
             Button("Fan on") {
                 setFan("AUTO")
-                print("on")
+                state.lasttemp = 200.0
             }
             .keyboardShortcut("1")
             Divider()
@@ -145,9 +181,11 @@ struct SilentMenuApp: App {
             Image(systemName: "fanblades")
             Text(String(format: "%.0f", state.currentRpm))
         }
-        MenuBarExtra {} label: {
+        MenuBarExtra {
+            MenuView(state: state)
+        } label: {
             Image(systemName: "thermometer.medium")
             Text(String(format: "%.1f", state.currentTemp))
-        }
+        }.menuBarExtraStyle(.window)
     }
 }
