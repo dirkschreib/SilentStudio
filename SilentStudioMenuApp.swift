@@ -44,9 +44,26 @@ extension Dictionary: RawRepresentable where Key == Float, Value == String {
     }
 }
 
+struct Measurement {
+    let time: Date
+    let temperature: Float
+    let rpm: Float
+}
+
+struct MeasurementHistory {
+    var measurements: [Measurement] = []
+    
+    mutating func add(_ measurement: Measurement) {
+        if measurements.count == 720 {
+            measurements.remove(at: 0)
+        }
+        measurements.append(measurement)
+    }
+}
 class HWStatus: ObservableObject {
     static let connection = try! IOServiceConnection("AppleSMC")
     var timer: Timer?
+    @Published var measurementHistory = MeasurementHistory()
     @Published var checkIntervall: Double = 5.0
     @Published var currentTemp: Float = 0.0
     @Published var currentRpm: Float = 0.0
@@ -93,7 +110,8 @@ class HWStatus: ObservableObject {
         do {
             currentTemp = try sensorlist.reduce(0.0,{ result, sensor in max(result, try HWStatus.connection.read(sensor))})
             currentRpm = try fanlist.reduce(10000.0, {result, fan in min(result, try HWStatus.connection.read(fan))})
-            print(now, "current", self.currentTemp, self.currentRpm, self.lasttemp)
+            measurementHistory.add(Measurement(time: Date(), temperature: currentTemp, rpm: currentRpm))
+            //print(now, "current", self.currentTemp, self.currentRpm, self.lasttemp)
 
             if automatic {
                 // only change rpm if temperature crosses a "border"
@@ -125,8 +143,47 @@ class HWStatus: ObservableObject {
 
 struct MenuView: View {
     @ObservedObject var state: HWStatus
+    @State var temp: Float = 0.0
+    @State var rpm: String = "AUTO"
 
     var body: some View {
+        Chart() {
+            ForEach(state.measurementHistory.measurements.indices, id:\.self) { idx in
+                LineMark(x: .value("Time", state.measurementHistory.measurements[idx].time), y: .value("Temp", state.measurementHistory.measurements[idx].temperature))
+                    .foregroundStyle(by: .value("type", "Temp"))
+            }
+        }
+        .chartYScale(domain: 40...70)
+        .frame(minWidth:300, minHeight:150).padding(16)
+        
+        Chart() {
+            ForEach(state.measurementHistory.measurements.indices, id:\.self) { idx in
+                LineMark(x: .value("Time", state.measurementHistory.measurements[idx].time), y: .value("Rpm", state.measurementHistory.measurements[idx].rpm))
+                        .foregroundStyle(by: .value("type", "Rpm"))
+            }
+        }
+        .foregroundColor(.blue)
+        .chartYScale(domain: 0...2000)
+        .frame(minWidth:300, minHeight:150).padding(16)
+
+        List() {
+            Section("Temperature / RPM points") {
+                ForEach(state.targetrpm.sorted(by: <), id:\.key) { key, value in
+                    HStack {
+                        Text(String(key))
+                        Spacer()
+                        Text(value)
+                    }
+                }
+                .onDelete { indexSet in print("delete", indexSet.first ?? 0,  state.targetrpm.sorted(by: <)[indexSet.first ?? 0]); state.targetrpm.removeValue(forKey: state.targetrpm.sorted(by: <)[indexSet.first ?? 0].key) }
+            }
+        }
+        HStack {
+            TextField("temperature", value: $temp, formatter: NumberFormatter())
+            Spacer()
+            TextField("rpm", text: $rpm)
+            Button("Add") { print ("add", temp, rpm); state.targetrpm[temp] = rpm }
+        }.padding(16)
         Chart() {
             ForEach(state.chartRpm.sorted(by: <), id: \.key) { key, value in
                 LineMark(x: .value("Temp", key), y: .value("Rpm", value)).interpolationMethod(.stepEnd).lineStyle(StrokeStyle(lineWidth:3,lineCap: .round, lineJoin: .round))
@@ -134,20 +191,22 @@ struct MenuView: View {
             ForEach(state.chartRpm.sorted(by: <), id: \.key) { key, value in
                 LineMark(x: .value("Temp", key), y: .value("Rpm", value)).interpolationMethod(.stepStart).lineStyle(StrokeStyle(lineWidth:3,lineCap: .round, lineJoin: .round))
             }.foregroundStyle(by: .value("way", "down"))
-            PointMark(x: .value("Temp", state.currentTemp), y: .value("Rpm", state.currentRpm)).foregroundStyle(by: .value("way", "current")).annotation() {
-                VStack {
-                    HStack {
-                        Image(systemName: "thermometer.medium")
-                        Text(String(format: "%.1f", state.currentTemp))
-                    }
-                    HStack {
-                        Image(systemName: "fanblades")
-                        Text(String(format: "%.0f", state.currentRpm))
+            PointMark(x: .value("Temp", state.currentTemp), y: .value("Rpm", state.currentRpm)).foregroundStyle(by: .value("way", "current"))
+                .annotation() {
+                    VStack {
+                        HStack {
+                            Image(systemName: "thermometer.medium")
+                            Text(String(format: "%.1f", state.currentTemp))
+                        }
+                        HStack {
+                            Image(systemName: "fanblades")
+                            Text(String(format: "%.0f", state.currentRpm))
+                        }
                     }
                 }
-            }
-        }.frame(minWidth:300, minHeight:300).padding(16)
-            .chartXScale(domain: 40...60)
+        }.frame(minWidth:300, minHeight:150).padding(16)
+            .chartXScale(domain: 40...70)
+            .chartYScale(domain: 0...2000)
     }
 }
 
@@ -182,7 +241,7 @@ struct SilentMenuApp: App {
             Text(String(format: "%.0f", state.currentRpm))
         }
         MenuBarExtra {
-            MenuView(state: state)
+            MenuView(state: state).frame(minHeight: 750)
         } label: {
             Image(systemName: "thermometer.medium")
             Text(String(format: "%.1f", state.currentTemp))
