@@ -46,7 +46,7 @@ extension Dictionary: RawRepresentable where Key == Float, Value == String {
 
 struct Measurement {
     let time: Date
-    let temperature: Float
+    let temperatures: [String:Float]
     let rpm: Float
 }
 
@@ -108,9 +108,10 @@ class HWStatus: ObservableObject {
     
     func updateTempRpm(_ tim: Timer) {
         do {
-            currentTemp = try sensorlist.reduce(0.0,{ result, sensor in max(result, try HWStatus.connection.read(sensor))})
+            let allTemps = try sensorlist.reduce(into: [:]) {$0[$1] = try HWStatus.connection.read($1) }
+            currentTemp = allTemps.reduce(0.0,{ result, sensor in max(result, sensor.value)})
             currentRpm = try fanlist.reduce(10000.0, {result, fan in min(result, try HWStatus.connection.read(fan))})
-            measurementHistory.add(Measurement(time: Date(), temperature: currentTemp, rpm: currentRpm))
+            measurementHistory.add(Measurement(time: Date(), temperatures: allTemps, rpm: currentRpm))
             //print(now, "current", self.currentTemp, self.currentRpm, self.lasttemp)
 
             if automatic {
@@ -147,36 +148,39 @@ struct MenuView: View {
     @State var rpm: String = "AUTO"
 
     var body: some View {
+        Text("Temperature in °C").padding([.top], 8)
         Chart() {
             ForEach(state.measurementHistory.measurements.indices, id:\.self) { idx in
-                LineMark(x: .value("Time", state.measurementHistory.measurements[idx].time), y: .value("Temp", state.measurementHistory.measurements[idx].temperature))
-                    .foregroundStyle(by: .value("type", "Temp"))
+                ForEach(state.measurementHistory.measurements[idx].temperatures.sorted(by:<), id:\.key) { sensor, temp in
+                    LineMark(x: .value("Time", state.measurementHistory.measurements[idx].time), y: .value("Temp", temp))
+                        .foregroundStyle(by: .value("type", sensor))
+                }
             }
         }
-        .chartYScale(domain: 40...70)
+        .chartYScale(domain: 30...70)
         .frame(minWidth:300, minHeight:150).padding(16)
         
+        Text("Fan speed in rpm")
         Chart() {
             ForEach(state.measurementHistory.measurements.indices, id:\.self) { idx in
                 LineMark(x: .value("Time", state.measurementHistory.measurements[idx].time), y: .value("Rpm", state.measurementHistory.measurements[idx].rpm))
-                        .foregroundStyle(by: .value("type", "Rpm"))
+                        //.foregroundStyle(by: .value("type", "Rpm"))
             }
         }
         .foregroundColor(.blue)
         .chartYScale(domain: 0...2000)
-        .frame(minWidth:300, minHeight:150).padding(16)
+        .frame(minWidth:300, minHeight:100).padding(16)
 
+        Text("Temperature/rpm points")
         List() {
-            Section("Temperature / RPM points") {
-                ForEach(state.targetrpm.sorted(by: <), id:\.key) { key, value in
-                    HStack {
-                        Text(String(key))
-                        Spacer()
-                        Text(value)
-                    }
+            ForEach(state.targetrpm.sorted(by: <), id:\.key) { key, value in
+                HStack {
+                    Text(String(key))
+                    Spacer()
+                    Text(value)
                 }
-                .onDelete { indexSet in print("delete", indexSet.first ?? 0,  state.targetrpm.sorted(by: <)[indexSet.first ?? 0]); state.targetrpm.removeValue(forKey: state.targetrpm.sorted(by: <)[indexSet.first ?? 0].key) }
             }
+            .onDelete { indexSet in print("delete", indexSet.first ?? 0,  state.targetrpm.sorted(by: <)[indexSet.first ?? 0]); state.targetrpm.removeValue(forKey: state.targetrpm.sorted(by: <)[indexSet.first ?? 0].key) }
         }
         HStack {
             TextField("temperature", value: $temp, formatter: NumberFormatter())
@@ -204,8 +208,8 @@ struct MenuView: View {
                         }
                     }
                 }
-        }.frame(minWidth:300, minHeight:150).padding(16)
-            .chartXScale(domain: 40...70)
+        }.frame(minWidth:300, minHeight:100).padding(16)
+            .chartXScale(domain: 30...70)
             .chartYScale(domain: 0...2000)
     }
 }
