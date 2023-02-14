@@ -11,6 +11,8 @@ import Charts
 var sensorlist = ["TT0D", "TT1D", "Tp02"]
 var fanlist = ["F0Ac", "F1Ac"]
 
+let AUTO_RPM = 1330
+
 func setFan(_ rpm: String) {
     do {
         let task = Process()
@@ -24,10 +26,10 @@ func setFan(_ rpm: String) {
     }
 }
 
-extension Dictionary: RawRepresentable where Key == Float, Value == String {
+extension Dictionary: RawRepresentable where Key == Float, Value == Int? {
     public init?(rawValue: String) {
         guard let data = rawValue.data(using: .utf8),  // convert from String to Data
-            let result = try? JSONDecoder().decode([Float:String].self, from: data)
+            let result = try? JSONDecoder().decode([Float:Int?].self, from: data)
         else {
             return nil
         }
@@ -67,14 +69,13 @@ class HWStatus: ObservableObject {
     @Published var checkIntervall: Double = 5.0
     @Published var currentTemp: Float = 0.0
     @Published var currentRpm: Float = 0.0
-    @AppStorage("targetrpm") var targetrpm: [Float:String] = [0.0:"0", 50.0:"0", 60.0:"AUTO"] {
+    @AppStorage("targetrpm") var targetrpm: [Float:Int?] = [0.0:0, 45.0:0, 65.0:nil] {
         willSet { DispatchQueue.main.async { self.objectWillChange.send() }}
     }
     @AppStorage("automatic") var automatic = true {
         willSet { DispatchQueue.main.async { self.objectWillChange.send() }}
     }
     var lasttemp: Float = 0.0
-    var chartRpm: [Float:Int] = [:]
     let dateFormatter = DateFormatter()
     var now: String {
         dateFormatter.string(from: Date())
@@ -82,7 +83,6 @@ class HWStatus: ObservableObject {
     
     init() {
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        chartRpm = Dictionary(uniqueKeysWithValues: targetrpm.map() { key, value in if value == "AUTO" { return (key,1330) } else { return (key,Int(value) ?? 0) }} )
         let _ = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue:nil, using: self.didWake(_:))
         let _ = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue:nil, using: self.willSleep(_:))
         timer = Timer.scheduledTimer(withTimeInterval: checkIntervall, repeats: true, block: updateTempRpm(_:))
@@ -94,15 +94,15 @@ class HWStatus: ObservableObject {
         do {
             self.currentTemp = try sensorlist.reduce(0.0,{ result, sensor in max(result, try HWStatus.connection.read(sensor))})
             if automatic {
-                let x = self.targetrpm.sorted(by: <).last(where: {$0.key <= self.currentTemp})
+                let x = self.targetrpm.keys.sorted(by: <).last(where: {$0 <= self.currentTemp})
                 
                 if let x {
-                    setFan(x.value)
-                    self.lasttemp = x.key
+                    setFan(targetrpm[x]! == nil ? "AUTO" : String( targetrpm[x]!! ) )
+                    self.lasttemp = x
                 }
             }
         } catch {
-            print(now, "error")
+            print(now, "error setStartTemp")
         }
     }
     
@@ -120,7 +120,7 @@ class HWStatus: ObservableObject {
                     if (self.lasttemp < temp && temp <= self.currentTemp) ||
                         (self.currentTemp <= temp && temp < self.lasttemp) {
                         // temp now higher or lower
-                        setFan(rpm)
+                        setFan(rpm == nil ? "AUTO": String(rpm!))
                         self.lasttemp = temp
                     }
                 }
@@ -145,7 +145,7 @@ class HWStatus: ObservableObject {
 struct MenuView: View {
     @ObservedObject var state: HWStatus
     @State var temp: Float = 0.0
-    @State var rpm: String = "AUTO"
+    @State var rpm: Int? = nil
 
     var body: some View {
         Text("Temperature in °C").padding([.top], 8)
@@ -172,36 +172,37 @@ struct MenuView: View {
         .frame(minWidth:300, minHeight:100).padding(16)
 
         Text("Temperature/rpm points")
-            ForEach(state.targetrpm.sorted(by: <), id:\.key) { key, value in
-                HStack {
-                    Text(String(key))
-                    Spacer()
-                    Text(value)
-                    Button(role: .destructive ,action: {
-                        state.targetrpm.removeValue(forKey: key)
-                        state.chartRpm = Dictionary(uniqueKeysWithValues: state.targetrpm.map() { key, value in if value == "AUTO" { return (key,1330) } else { return (key,Int(value) ?? 0) }} )
-                    }) {
-                        Image(systemName: "minus.square.fill").renderingMode(.original).imageScale(.large)
-                    }.buttonStyle(.plain)
-                }.padding([.leading, .trailing],16)
-            }
+        ForEach(state.targetrpm.keys.sorted(by: <), id:\.self) { key in
+            HStack {
+                Text(String(key))
+                Spacer()
+                Text(state.targetrpm[key]! == nil ? "AUTO": String(state.targetrpm[key]!!))
+                Button(role: .destructive ,action: {
+                    state.targetrpm.removeValue(forKey: key)
+                    //state.chartRpm = Dictionary(uniqueKeysWithValues: state.targetrpm.map() { key, value in if value == "AUTO" { return (key,1330) } else { return (key,Int(value) ?? 0) }} )
+                }) {
+                    Image(systemName: "minus.square.fill").renderingMode(.original).imageScale(.large)
+                }.buttonStyle(.plain)
+            }.padding([.leading, .trailing],16)
+        }
         HStack {
             TextField("temperature", value: $temp, formatter: NumberFormatter())
             Spacer()
-            TextField("rpm", text: $rpm).multilineTextAlignment(.trailing)
+            TextField("rpm", value: $rpm, format: .number).multilineTextAlignment(.trailing)
             Button(action: {
                 state.targetrpm[temp] = rpm
-                state.chartRpm = Dictionary(uniqueKeysWithValues: state.targetrpm.map() { key, value in if value == "AUTO" { return (key,1330) } else { return (key,Int(value) ?? 0) }} )
+                //state.chartRpm = Dictionary(uniqueKeysWithValues: state.targetrpm.map() { key, value in if value == "AUTO" { return (key,1330) } else { return (key,Int(value) ?? 0) }} )
             }) {
                     Image(systemName: "plus.square.fill").renderingMode(.original).imageScale(.large)
                 }.buttonStyle(.plain)
         }.padding([.leading,.trailing],16)
         Chart() {
-            ForEach(state.chartRpm.sorted(by: <), id: \.key) { key, value in
-                LineMark(x: .value("Temp", key), y: .value("Rpm", value)).interpolationMethod(.stepEnd).lineStyle(StrokeStyle(lineWidth:3,lineCap: .round, lineJoin: .round))
+            ForEach(state.targetrpm.keys.sorted(by: <), id:\.self) { key in
+                LineMark(x: .value("Temp", key), y: .value("Rpm", state.targetrpm[key]! ?? AUTO_RPM)).interpolationMethod(.stepEnd).lineStyle(StrokeStyle(lineWidth:3,lineCap: .round, lineJoin: .round))
             }.foregroundStyle(by: .value("way", "up"))
-            ForEach(state.chartRpm.sorted(by: <), id: \.key) { key, value in
-                LineMark(x: .value("Temp", key), y: .value("Rpm", value)).interpolationMethod(.stepStart).lineStyle(StrokeStyle(lineWidth:3,lineCap: .round, lineJoin: .round))
+            
+            ForEach(state.targetrpm.keys.sorted(by: <), id: \.self) { key in
+                LineMark(x: .value("Temp", key), y: .value("Rpm", state.targetrpm[key]! ?? AUTO_RPM)).interpolationMethod(.stepStart).lineStyle(StrokeStyle(lineWidth:3,lineCap: .round, lineJoin: .round))
             }.foregroundStyle(by: .value("way", "down"))
             PointMark(x: .value("Temp", state.currentTemp), y: .value("Rpm", state.currentRpm)).foregroundStyle(by: .value("way", "current"))
                 .annotation() {
