@@ -12,7 +12,7 @@ sudo chown root SilentStudio
 sudo chmod +s SilentStudio
 ```
 
-With the last two commands you don't need sudo for every invocation of SilentStudio from the commandline. If you want to use the SilentStudioMenu app, they are mandatory. SilentStudioMenu will invoke SilentStudio to set the fan speed. It is currently not possible to change the "temperature curve" inside SilentStudioMenu. This will be considered in future updates.
+With the last two commands you don't need sudo for every invocation of SilentStudio from the commandline. If you want to use the SilentStudioMenu app, they are mandatory. SilentStudioMenu will invoke SilentStudio to set the fan speed. 
 
 Besides the refactoring of IOServiceConnection, SilentStudio has one more option "-f" to set the fan speed directly.
 
