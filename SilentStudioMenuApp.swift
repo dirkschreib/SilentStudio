@@ -172,22 +172,30 @@ struct MenuView: View {
         .frame(minWidth:300, minHeight:100).padding(16)
 
         Text("Temperature/rpm points")
-        List() {
             ForEach(state.targetrpm.sorted(by: <), id:\.key) { key, value in
                 HStack {
                     Text(String(key))
                     Spacer()
                     Text(value)
-                }
+                    Button(role: .destructive ,action: {
+                        state.targetrpm.removeValue(forKey: key)
+                        state.chartRpm = Dictionary(uniqueKeysWithValues: state.targetrpm.map() { key, value in if value == "AUTO" { return (key,1330) } else { return (key,Int(value) ?? 0) }} )
+                    }) {
+                        Image(systemName: "minus.square.fill").renderingMode(.original).imageScale(.large)
+                    }.buttonStyle(.plain)
+                }.padding([.leading, .trailing],16)
             }
-            .onDelete { indexSet in print("delete", indexSet.first ?? 0,  state.targetrpm.sorted(by: <)[indexSet.first ?? 0]); state.targetrpm.removeValue(forKey: state.targetrpm.sorted(by: <)[indexSet.first ?? 0].key) }
-        }
         HStack {
             TextField("temperature", value: $temp, formatter: NumberFormatter())
             Spacer()
-            TextField("rpm", text: $rpm)
-            Button("Add") { print ("add", temp, rpm); state.targetrpm[temp] = rpm }
-        }.padding(16)
+            TextField("rpm", text: $rpm).multilineTextAlignment(.trailing)
+            Button(action: {
+                state.targetrpm[temp] = rpm
+                state.chartRpm = Dictionary(uniqueKeysWithValues: state.targetrpm.map() { key, value in if value == "AUTO" { return (key,1330) } else { return (key,Int(value) ?? 0) }} )
+            }) {
+                    Image(systemName: "plus.square.fill").renderingMode(.original).imageScale(.large)
+                }.buttonStyle(.plain)
+        }.padding([.leading,.trailing],16)
         Chart() {
             ForEach(state.chartRpm.sorted(by: <), id: \.key) { key, value in
                 LineMark(x: .value("Temp", key), y: .value("Rpm", value)).interpolationMethod(.stepEnd).lineStyle(StrokeStyle(lineWidth:3,lineCap: .round, lineJoin: .round))
