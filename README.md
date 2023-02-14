@@ -1,7 +1,9 @@
 # SilentStudio
 Set fan speed of Mac Studio
 
-## New Version (Beta)
+<img width="322" alt="MenuBarExtra" src="https://user-images.githubusercontent.com/39700157/218793527-8b33418e-9326-40dc-b05a-9b290903860c.png">
+
+## Installation instructions
 
 I separated IOServiceConnection into a separate file to reuse it in the menu app. Unfortunately Swift (as an interpreter) is not able to handle scripts with multiple source files. We have to compile it together:
 
@@ -16,7 +18,7 @@ With the last two commands you don't need sudo for every invocation of SilentStu
 
 Besides the refactoring of IOServiceConnection, SilentStudio has one more option "-f" to set the fan speed directly.
 
-## How to use?
+## How to use the command line script
 Inside terminal:
 ```
 ./SilentStudio -h
