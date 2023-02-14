@@ -97,6 +97,7 @@ class HWStatus: ObservableObject {
                 let x = self.targetrpm.keys.sorted(by: <).last(where: {$0 <= self.currentTemp})
                 
                 if let x {
+                    print(now, "set start temp")
                     setFan(targetrpm[x]! == nil ? "AUTO" : String( targetrpm[x]!! ) )
                     self.lasttemp = x
                 }
@@ -137,8 +138,10 @@ class HWStatus: ObservableObject {
     }
 
     func didWake(_ notification: Notification) {
-        print(now, "did wake")
-        setStartTemp()
+        print(now, "did wake set start temp in 5s")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            self.setStartTemp()
+        }
     }
 }
 
